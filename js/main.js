@@ -1,13 +1,10 @@
-var SQL_FROM_REGEX = /FROM\s+([^\s;]+)/mi;
-var SQL_LIMIT_REGEX = /LIMIT\s+(\d+)(?:\s*,\s*(\d+))?/mi;
-var SQL_SELECT_REGEX = /SELECT\s+[^;]+\s+FROM\s+/mi;
-
-var db = null;
+var currentZip = null;
 var rowCounts = [];
-var editor = ace.edit("sql-editor");
 var bottomBarDefaultPos = null, bottomBarDisplayStyle = null;
 var errorBox = $("#error");
-var lastCachedQueryCount = {};
+
+var showFileClickExplanation = true;
+var lastShownFile = null;
 
 $.urlParam = function(name){
     var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
@@ -22,7 +19,7 @@ $.urlParam = function(name){
 var fileReaderOpts = {
     readAsDefault: "ArrayBuffer", on: {
         load: function (e, file) {
-            loadDB(e.target.result);
+            loadZip(file);
         }
     }
 };
@@ -88,17 +85,6 @@ if (typeof FileReader === "undefined") {
     $('#dropzone, #dropzone-dialog').fileReaderJS(fileReaderOpts);
 }
 
-//Initialize editor
-editor.setTheme("ace/theme/chrome");
-editor.renderer.setShowGutter(false);
-editor.renderer.setShowPrintMargin(false);
-editor.renderer.setPadding(20);
-editor.renderer.setScrollMargin(8, 8, 0, 0);
-editor.setHighlightActiveLine(false);
-editor.getSession().setUseWrapMode(true);
-editor.getSession().setMode("ace/mode/sql");
-editor.setOptions({ maxLines: 5 });
-
 //Update pager position
 $(window).resize(windowResize).scroll(positionFooter);
 windowResize();
@@ -122,100 +108,60 @@ if (loadUrlDB != null) {
     xhr.send();
 }
 
-function loadDB(arrayBuffer) {
+function loadZip(file) {
     setIsLoading(true);
 
     resetTableList();
 
     setTimeout(function () {
-        var tables;
-        try {
-            db = new SQL.Database(new Uint8Array(arrayBuffer));
+        JSZip.loadAsync(file).then(function(zip) {
+            currentZip = zip;
 
-            //Get all table names from master table
-            tables = db.prepare("SELECT * FROM sqlite_master WHERE type='table' ORDER BY name");
-        } catch (ex) {
+            var firstFolderName = null;
+            var tableList = $("#tables");
+
+            var rootFileCount = getFilesForRoot(zip).length;
+            if (rootFileCount > 0) {
+                rowCounts['/'] = rootFileCount;
+                firstFolderName = '/';
+            }
+
+            zip.forEach(function (relativePath, zipEntry) {
+                if (!zipEntry.dir) {
+                  return;
+                }
+
+                var name = zipEntry.name;
+
+                if (firstFolderName === null) {
+                    firstFolderName = name;
+                }
+
+                var rowCount = getFilesForFolder(zip, name).length;
+                rowCounts[name] = rowCount;
+            });
+
+            for (var rowName in rowCounts) {
+              var rowCount = rowCounts[rowName];
+              tableList.append('<option value="' + rowName + '">' + rowName + ' (' + rowCount + ' files)</option>');
+            }
+
+            //Select first table and show It
+            tableList.select2("val", firstFolderName);
+            renderQuery(firstFolderName);
+
+            $("#output-box").fadeIn();
+            $(".nouploadinfo").hide();
+            $("#sample-db-link").hide();
+            $("#dropzone").delay(50).animate({height: 50}, 500);
+            $("#success-box").show();
+
+            setIsLoading(false);
+        }, function (ex) {
             setIsLoading(false);
             alert(ex);
-            return;
-        }
-
-        var firstTableName = null;
-        var tableList = $("#tables");
-
-        while (tables.step()) {
-            var rowObj = tables.getAsObject();
-            var name = rowObj.name;
-
-            if (firstTableName === null) {
-                firstTableName = name;
-            }
-            var rowCount = getTableRowsCount(name);
-            rowCounts[name] = rowCount;
-            tableList.append('<option value="' + name + '">' + name + ' (' + rowCount + ' rows)</option>');
-        }
-
-        //Select first table and show It
-        tableList.select2("val", firstTableName);
-        doDefaultSelect(firstTableName);
-
-        $("#output-box").fadeIn();
-        $(".nouploadinfo").hide();
-        $("#sample-db-link").hide();
-        $("#dropzone").delay(50).animate({height: 50}, 500);
-        $("#success-box").show();
-
-        setIsLoading(false);
+        });
     }, 50);
-}
-
-function getTableRowsCount(name) {
-    var sel = db.prepare("SELECT COUNT(*) AS count FROM '" + name + "'");
-    if (sel.step()) {
-        return sel.getAsObject().count;
-    } else {
-        return -1;
-    }
-}
-
-function getQueryRowCount(query) {
-    if (query === lastCachedQueryCount.select) {
-        return lastCachedQueryCount.count;
-    }
-
-    var queryReplaced = query.replace(SQL_SELECT_REGEX, "SELECT COUNT(*) AS count_sv FROM ");
-
-    if (queryReplaced !== query) {
-        queryReplaced = queryReplaced.replace(SQL_LIMIT_REGEX, "");
-        var sel = db.prepare(queryReplaced);
-        if (sel.step()) {
-            var count = sel.getAsObject().count_sv;
-
-            lastCachedQueryCount.select = query;
-            lastCachedQueryCount.count = count;
-
-            return count;
-        } else {
-            return -1;
-        }
-    } else {
-        return -1;
-    }
-}
-
-function getTableColumnTypes(tableName) {
-    var result = [];
-    var sel = db.prepare("PRAGMA table_info('" + tableName + "')");
-
-    while (sel.step()) {
-        var obj = sel.getAsObject();
-        result[obj.name] = obj.type;
-        /*if (obj.notnull === 1) {
-            result[obj.name] += " NOTNULL";
-        }*/
-    }
-
-    return result;
 }
 
 function resetTableList() {
@@ -229,7 +175,7 @@ function resetTableList() {
         formatResult: selectFormatter
     });
     tables.on("change", function (e) {
-        doDefaultSelect(e.val);
+        renderQuery(e.val);
     });
 }
 
@@ -258,114 +204,6 @@ function dropzoneClick() {
     $("#dropzone-dialog").click();
 }
 
-function doDefaultSelect(name) {
-    var defaultSelect = "SELECT * FROM '" + name + "' LIMIT 0,30";
-    editor.setValue(defaultSelect, -1);
-    renderQuery(defaultSelect);
-}
-
-function executeSql() {
-    var query = editor.getValue();
-    renderQuery(query);
-    $("#tables").select2("val", getTableNameFromQuery(query));
-}
-
-function getTableNameFromQuery(query) {
-    var sqlRegex = SQL_FROM_REGEX.exec(query);
-    if (sqlRegex != null) {
-        return sqlRegex[1].replace(/"|'/gi, "");
-    } else {
-        return null;
-    }
-}
-
-function parseLimitFromQuery(query, tableName) {
-    var sqlRegex = SQL_LIMIT_REGEX.exec(query);
-    if (sqlRegex != null) {
-        var result = {};
-
-        if (sqlRegex.length > 2 && typeof sqlRegex[2] !== "undefined") {
-            result.offset = parseInt(sqlRegex[1]);
-            result.max = parseInt(sqlRegex[2]);
-        } else {
-            result.offset = 0;
-            result.max = parseInt(sqlRegex[1]);
-        }
-
-        if (result.max == 0) {
-            result.pages = 0;
-            result.currentPage = 0;
-            return result;
-        }
-
-        if (typeof tableName === "undefined") {
-            tableName = getTableNameFromQuery(query);
-        }
-
-        var queryRowsCount = getQueryRowCount(query);
-        if (queryRowsCount != -1) {
-            result.pages = Math.ceil(queryRowsCount / result.max);
-        }
-        result.currentPage = Math.floor(result.offset / result.max) + 1;
-        result.rowCount = queryRowsCount;
-
-        return result;
-    } else {
-        return null;
-    }
-}
-
-function setPage(el, next) {
-    if ($(el).hasClass("disabled")) return;
-
-    var query = editor.getValue();
-    var limit = parseLimitFromQuery(query);
-
-    var pageToSet;
-    if (typeof next !== "undefined") {
-        pageToSet = (next ? limit.currentPage : limit.currentPage - 2 );
-    } else {
-        var page = prompt("Go to page");
-        if (!isNaN(page) && page >= 1 && page <= limit.pages) {
-            pageToSet = page - 1;
-        } else {
-            return;
-        }
-    }
-
-    var offset = (pageToSet * limit.max);
-    editor.setValue(query.replace(SQL_LIMIT_REGEX, "LIMIT " + offset + "," + limit.max), -1);
-
-    executeSql();
-}
-
-function refreshPagination(query, tableName) {
-    var limit = parseLimitFromQuery(query, tableName);
-    if (limit !== null && limit.pages > 0) {
-
-        var pager = $("#pager");
-        pager.attr("title", "Row count: " + limit.rowCount);
-        pager.tooltip('fixTitle');
-        pager.text(limit.currentPage + " / " + limit.pages);
-
-        if (limit.currentPage <= 1) {
-            $("#page-prev").addClass("disabled");
-        } else {
-            $("#page-prev").removeClass("disabled");
-        }
-
-        if ((limit.currentPage + 1) > limit.pages) {
-            $("#page-next").addClass("disabled");
-        } else {
-            $("#page-next").removeClass("disabled");
-        }
-
-        $("#bottom-bar").show();
-    } else {
-        $("#bottom-bar").hide();
-    }
-}
-
 function showError(msg) {
     $("#data").hide();
     $("#bottom-bar").hide();
@@ -373,7 +211,7 @@ function showError(msg) {
     errorBox.text(msg);
 }
 
-function renderQuery(query) {
+function renderQuery(folder) {
     var dataBox = $("#data");
     var thead = dataBox.find("thead").find("tr");
     var tbody = dataBox.find("tbody");
@@ -383,45 +221,81 @@ function renderQuery(query) {
     errorBox.hide();
     dataBox.show();
 
-    var columnTypes = [];
-    var tableName = getTableNameFromQuery(query);
-    if (tableName != null) {
-        columnTypes = getTableColumnTypes(tableName);
-    }
+    var columnNames = ["Name", "Date", "Comment", "Permissions (DOS / UNIX)"];
 
-    var sel;
-    try {
-        sel = db.prepare(query);
-    } catch (ex) {
-        showError(ex);
-        return;
+    var files;
+    if (folder === '/') {
+        files = getFilesForRoot(currentZip);
+    } else {
+        files = getFilesForFolder(currentZip, folder);
     }
 
     var addedColums = false;
-    while (sel.step()) {
+    for (var fileName in files) {
+        var file = files[fileName];
+        if (file.dir) {
+          continue;
+        }
+
         if (!addedColums) {
             addedColums = true;
-            var columnNames = sel.getColumnNames();
             for (var i = 0; i < columnNames.length; i++) {
-                var type = columnTypes[columnNames[i]];
-                thead.append('<th><span data-toggle="tooltip" data-placement="top" title="' + type + '">' + columnNames[i] + "</span></th>");
+                var columnName = columnNames[i];
+                thead.append('<th><span data-toggle="tooltip" data-placement="top" title="' + columnName + '">' + columnName + "</span></th>");
             }
         }
 
+        var columnValues = [];
+        columnValues.push(file.name.replace(folder, ''));
+        columnValues.push(file.date);
+        columnValues.push(file.column);
+        columnValues.push(file.dosPermissions + ' / ' + file.unixPermissions);
+
         var tr = $('<tr>');
-        var s = sel.get();
-        for (var i = 0; i < s.length; i++) {
-            tr.append('<td><span title="' + s[i] + '">' + s[i] + '</span></td>');
+        for (var i = 0; i < columnValues.length; i++) {
+            var columnValue = columnValues[i];
+            var fileElement = tr.append('<td><span title="' + columnValue + '">' + columnValue + '</span></td>');
+            registerFileClickListener(file, fileElement);
         }
         tbody.append(tr);
     }
 
-    refreshPagination(query, tableName);
-
     $('[data-toggle="tooltip"]').tooltip({html: true});
-    dataBox.editableTableWidget();
 
     setTimeout(function () {
         positionFooter();
     }, 100);
+}
+
+function registerFileClickListener(file, element) {
+    element.click(function() {
+        if (showFileClickExplanation) {
+          showFileClickExplanation = false;
+
+          window.alert("open console to inspect the content of this file");
+
+          console.log('right click object in console and "Store as global variable". afterwards do something like "temp1.async(\'string\').then(console.log)"');
+          console.log('more information here: https://stuk.github.io/jszip/documentation/api_zipobject/async.html');
+          console.log('for example: "temp1.async(\'base64\').then(function (content) { window.open(\'data:;base64,\' + content)})"');
+        }
+
+        if (lastShownFile === file) {
+          return;
+        }
+        lastShownFile = file;
+
+        console.log(file);
+    });
+}
+
+function getFilesForRoot(zip) {
+    return zip.filter(function(relativePath, file) {
+      return relativePath.indexOf('/') < 0;
+    });
+}
+
+function getFilesForFolder(zip, folder) {
+    return zip.folder(folder).filter(function(relativePath, file) {
+      return relativePath.replace(folder, '').indexOf('/') < 0;
+    });
 }

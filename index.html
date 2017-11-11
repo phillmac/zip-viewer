@@ -3,11 +3,11 @@
 <head>
     <link rel="stylesheet" type="text/css" href="css/main.css"/>
     <meta charset="utf-8">
-    <meta name="description" content="sqlite file viewer">
-    <meta name="keywords" content="sqlite,viewer,db,database,online">
-    <meta name="author" content="Juraj Novák">
+    <meta name="description" content="zip file viewer">
+    <meta name="keywords" content="zip,viewer,archive,online">
+    <meta name="author" content="Thomas Taschauer (based on Juraj Novák)">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQLite Viewer</title>
+    <title>Zip Viewer</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/select2.css" rel="stylesheet">
     <link href="css/select2-bootstrap.css" rel="stylesheet">
@@ -29,8 +29,8 @@
         <div class="row">
             <div class="col-xs-6">
                 <img src="img/logo.svg" class="img-responsive pull-left" style="margin-right: 16px;"/>
-                <h3>SQLite Viewer</h3>
-                <p>view sqlite file online</p>
+                <h3>Zip Viewer</h3>
+                <p>view zip file online</p>
             </div>
             <div class="col-xs-6">
                 <a href="#" id="resizer" class="pull-right">
@@ -54,8 +54,8 @@
 
             <div class="nouploadinfo small">No file will be uploaded - uses only JavaScript HTML5 FileReader.<br/><br/>
             </div>
-            
-            <a id="sample-db-link" class="no-propagate small" href="examples/Chinook_Sqlite.sqlite">&hellip; or download &amp; try this sample file</a>
+
+            <a id="sample-db-link" class="no-propagate small" href="examples/example.zip">&hellip; or download &amp; try this sample file</a>
         </div>
         <div id="drop-loading" class="panel-body" style="display: none">
             <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span> <b>Processing file ...</b>
@@ -67,15 +67,6 @@
         <div class="row">
             <div class="col-md-12">
                 <select id="tables" class="form-control select2" title="Table"></select><br />
-            </div>
-
-            <div class="col-md-11">
-                <div id="sql-editor" class="panel panel-default form-control"></div>
-
-            </div>
-
-            <div class="col-sm-1">
-                <button class="btn btn-sm btn-primary" id="sql-run" type="submit" onclick="executeSql(this)">Execute</button>
             </div>
 
             <div class="col-md-12">
@@ -112,36 +103,35 @@
 
 <div class="container">
     <footer>
-        &copy; 2015, Juraj Novák, <a href="http://inloop.eu/" target="_blank">inloop.eu</a><br>
-        <small>| <a href="http://inloop.github.io/">other projects</a> |</small>
+        &copy; 2017, Thomas Taschauer, <a href="https://tomtasche.at/" target="_blank">tomtasche.at</a><br>
+        <small>| based on the amazing <a href="http://inloop.github.io/sqlite-viewer/">SQLite Viewer</a> |</small>
     </footer>
 </div>
 
 <input type="file" id="dropzone-dialog" style="opacity: 0;display:none">
 
 <div class="ribbon right grey hidden-xs">
-    <a href="https://github.com/inloop/sqlite-viewer">Fork me on GitHub</a>
+    <a href="https://github.com/tomtasche/zip-viewer">Fork me on GitHub</a>
 </div>
 
 <script src="js/jquery-1.11.3.min.js"></script>
 <script src="js/filereader.js"></script>
-<script src="js/sql.js"></script>
+<script src="js/jszip.js"></script>
 <script src="js/select2.min.js"></script>
-<script src="js/ace/ace.js"></script>
 <script src="js/bootstrap.min.js"></script>
 <script src="js/mindmup-editabletable.js"></script>
 <script src="js/main.js?v=8"></script>
 
 <script>
     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-                (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
-    ga('create', 'UA-67535271-1', 'auto');
+    ga('create', 'UA-10349252-30', 'auto');
     ga('send', 'pageview');
-
 </script>
+
 
 </body>
 </html>
