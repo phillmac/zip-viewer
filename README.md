@@ -4,7 +4,7 @@ Zip Viewer
 *View zip file online. Uses [JSZip](https://github.com/Stuk/jszip) for parsing zip files.*
 
 You can also load remote files (using JS ajax, remote server must send `Access-Control-Allow-Origin:*`):
-`http://tomtasche.github.io/zip-viewer/?url=http://example.com/data.zip`
+`https://tomtasche.github.io/zip-viewer/?url=https://example.com/data.zip`
 
 ![](/img/preview.png?raw=true "Example zip")
 
