@@ -272,8 +272,6 @@ function registerFileClickListener(file, element) {
         if (showFileClickExplanation) {
           showFileClickExplanation = false;
 
-          window.alert("open console to inspect the content of this file");
-
           console.log('right click object in console and "Store as global variable". afterwards do something like "temp1.async(\'string\').then(console.log)"');
           console.log('more information here: https://stuk.github.io/jszip/documentation/api_zipobject/async.html');
           console.log('for example: "temp1.async(\'base64\').then(function (content) { window.open(\'data:;base64,\' + content)})"');
@@ -283,6 +281,23 @@ function registerFileClickListener(file, element) {
           return;
         }
         lastShownFile = file;
+
+        file.async("blob").then(function (blob) {
+            // https://stackoverflow.com/a/35251739/198996
+            var dlink = document.createElement('a');
+            dlink.download = file.name;
+            dlink.href = window.URL.createObjectURL(blob);
+            dlink.onclick = function(e) {
+                // revokeObjectURL needs a delay to work properly
+                var that = this;
+                setTimeout(function() {
+                    window.URL.revokeObjectURL(that.href);
+                }, 1500);
+            };
+
+            dlink.click();
+            dlink.remove();
+        });
 
         console.log(file);
     });
