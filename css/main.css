@@ -83,6 +83,7 @@ footer small a {
 #output-box {
     display: none;
     margin-bottom: 20px;
+    margin-top: 20px;
 }
 
 #button-box {
