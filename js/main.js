@@ -1,28 +1,13 @@
 var currentZip = null;
 var rowCounts = [];
-var bottomBarDefaultPos = null, bottomBarDisplayStyle = null;
 var errorBox = $("#error");
 
 var showFileClickExplanation = true;
 var lastShownFile = null;
 
-$.urlParam = function(name){
-    var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
-    if (results==null){
-        return null;
-    }
-    else{
-        return results[1] || 0;
-    }
-};
+var base64 = "UEsDBAoAAAAAADJQa0vj5ZWwDAAAAAwAAAAJAAAASGVsbG8udHh0SGVsbG8gV29ybGQKUEsDBAoAAAAAADJQa0sAAAAAAAAAAAAAAAAHAAAAaW1hZ2VzL1BLAwQKAAAAAAAyUGtLPD/riikAAAApAAAAEAAAAGltYWdlcy9zbWlsZS5naWZHSUY4N2EFAAUAgAIAAAAA/94ALAAAAAAFAAUAAAIIjA+RZ6sKUgEAO1BLAQIUAAoAAAAAADJQa0vj5ZWwDAAAAAwAAAAJAAAAAAAAAAAAAAAAAAAAAABIZWxsby50eHRQSwECFAAKAAAAAAAyUGtLAAAAAAAAAAAAAAAABwAAAAAAAAAAABAAAAAzAAAAaW1hZ2VzL1BLAQIUAAoAAAAAADJQa0s8P+uKKQAAACkAAAAQAAAAAAAAAAAAAAAAAFgAAABpbWFnZXMvc21pbGUuZ2lmUEsFBgAAAAADAAMAqgAAAK8AAAAAAA==";
 
-var fileReaderOpts = {
-    readAsDefault: "ArrayBuffer", on: {
-        load: function (e, file) {
-            loadZip(file);
-        }
-    }
-};
+loadZip(base64);
 
 var selectFormatter = function (item) {
     var index = item.text.indexOf("(");
@@ -34,79 +19,7 @@ var selectFormatter = function (item) {
     }
 };
 
-var windowResize = function () {
-    positionFooter();
-    var container = $("#main-container");
-    var cleft = container.offset().left + container.outerWidth();
-    $("#bottom-bar").css("left", cleft);
-};
-
-var positionFooter = function () {
-    var footer = $("#bottom-bar");
-    var pager = footer.find("#pager");
-    var container = $("#main-container");
-    var containerHeight = container.height();
-    var footerTop = ($(window).scrollTop()+$(window).height());
-
-    if (bottomBarDefaultPos === null) {
-        bottomBarDefaultPos = footer.css("position");
-    }
-
-    if (bottomBarDisplayStyle === null) {
-        bottomBarDisplayStyle = pager.css("display");
-    }
-
-    if (footerTop > containerHeight) {
-        footer.css({
-            position: "static"
-        });
-        pager.css("display", "inline-block");
-    } else {
-        footer.css({
-            position: bottomBarDefaultPos
-        });
-        pager.css("display", bottomBarDisplayStyle);
-    }
-};
-
-var toggleFullScreen = function () {
-    var container = $("#main-container");
-    var resizerIcon = $("#resizer i");
-
-    container.toggleClass('container container-fluid');
-    resizerIcon.toggleClass('glyphicon-resize-full glyphicon-resize-small');
-}
-$('#resizer').click(toggleFullScreen);
-
-if (typeof FileReader === "undefined") {
-    $('#dropzone, #dropzone-dialog').hide();
-    $('#compat-error').show();
-} else {
-    $('#dropzone, #dropzone-dialog').fileReaderJS(fileReaderOpts);
-}
-
-//Update pager position
-$(window).resize(windowResize).scroll(positionFooter);
-windowResize();
-
 $(".no-propagate").on("click", function (el) { el.stopPropagation(); });
-
-//Check url to load remote DB
-var loadUrlDB = $.urlParam('url');
-if (loadUrlDB != null) {
-    setIsLoading(true);
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', loadUrlDB, true);
-    xhr.responseType = 'arraybuffer';
-
-    xhr.onload = function(e) {
-        loadDB(this.response);
-    };
-    xhr.onerror = function (e) {
-        setIsLoading(false);
-    };
-    xhr.send();
-}
 
 function loadZip(file) {
     setIsLoading(true);
@@ -114,7 +27,7 @@ function loadZip(file) {
     resetTableList();
 
     setTimeout(function () {
-        JSZip.loadAsync(file).then(function(zip) {
+        JSZip.loadAsync(file, {base64: true}).then(function(zip) {
             currentZip = zip;
 
             var firstFolderName = null;
@@ -151,9 +64,6 @@ function loadZip(file) {
             renderQuery(firstFolderName);
 
             $("#output-box").fadeIn();
-            $(".nouploadinfo").hide();
-            $("#sample-db-link").hide();
-            $("#dropzone").delay(50).animate({height: 50}, 500);
             $("#success-box").show();
 
             setIsLoading(false);
@@ -198,10 +108,6 @@ function extractFileNameWithoutExt(filename) {
     } else {
         return filename;
     }
-}
-
-function dropzoneClick() {
-    $("#dropzone-dialog").click();
 }
 
 function showError(msg) {
@@ -261,10 +167,6 @@ function renderQuery(folder) {
     }
 
     $('[data-toggle="tooltip"]').tooltip({html: true});
-
-    setTimeout(function () {
-        positionFooter();
-    }, 100);
 }
 
 function registerFileClickListener(file, element) {
