@@ -176,7 +176,7 @@ function resetTableList() {
     tables.empty();
     tables.append("<option></option>");
     tables.select2({
-        placeholder: "Select a table",
+        placeholder: "Select a folder",
         formatSelection: selectFormatter,
         formatResult: selectFormatter
     });
