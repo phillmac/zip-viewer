@@ -304,13 +304,19 @@ function registerFileClickListener(file, element) {
 }
 
 function getFilesForRoot(zip) {
-    return zip.filter(function(relativePath, file) {
-      return relativePath.indexOf('/') < 0;
+    var files = [];
+    zip.forEach(function(relativePath, file) {
+      files.push(file);
     });
+
+    return files;
 }
 
 function getFilesForFolder(zip, folder) {
-    return zip.folder(folder).filter(function(relativePath, file) {
-      return relativePath.replace(folder, '').indexOf('/') < 0;
+    var files = [];
+    zip.folder(folder).forEach(function(relativePath, file) {
+      files.push(file);
     });
+
+    return files;
 }
