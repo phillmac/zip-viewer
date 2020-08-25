@@ -141,6 +141,12 @@ function loadZip(file) {
                 rowCounts[name] = rowCount;
             });
 
+            if (firstFolderName === null) {
+                // some zip files do not declare directories explicitly
+                rowCounts[''] = 0;
+                firstFolderName = '';
+            }
+
             for (var rowName in rowCounts) {
               var rowCount = rowCounts[rowName];
               tableList.append('<option value="' + rowName + '">' + rowName + ' (' + rowCount + ' files)</option>');
@@ -304,19 +310,25 @@ function registerFileClickListener(file, element) {
 }
 
 function getFilesForRoot(zip) {
-    var files = [];
-    zip.forEach(function(relativePath, file) {
-      files.push(file);
+    return zip.filter(function(relativePath, file) {
+      return relativePath.indexOf('/') < 0;
     });
-
-    return files;
 }
 
 function getFilesForFolder(zip, folder) {
-    var files = [];
-    zip.folder(folder).forEach(function(relativePath, file) {
-      files.push(file);
-    });
+    var isNoFolderZip = false;
+    if (folder !== '') {
+        // some zip files do not declare directories explicitly
+        zip = zip.folder(folder);
+    } else {
+        isNoFolderZip = true;
+    }
 
-    return files;
+    return zip.filter(function(relativePath, file) {
+        if (isNoFolderZip) {
+            return true;
+        } else {
+            return relativePath.replace(folder, '').indexOf('/') < 0;
+        }
+    });
 }
