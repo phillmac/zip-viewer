@@ -100,7 +100,7 @@ if (loadUrlDB != null) {
     xhr.responseType = 'arraybuffer';
 
     xhr.onload = function(e) {
-        loadDB(this.response);
+        loadZip(this.response);
     };
     xhr.onerror = function (e) {
         setIsLoading(false);
