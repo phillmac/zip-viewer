@@ -5,6 +5,7 @@ var errorBox = $("#error");
 
 var showFileClickExplanation = true;
 var lastShownFile = null;
+let deBounce = false;
 
 $.urlParam = function(name){
     var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
@@ -283,12 +284,40 @@ function registerFileClickListener(file, element) {
           console.log('for example: "temp1.async(\'base64\').then(function (content) { window.open(\'data:;base64,\' + content)})"');
         }
 
-        if (lastShownFile === file) {
+        if (deBounce) {
           return;
         }
-        lastShownFile = file;
-
+    
+        deBounce = true;
+    
+        setTimeout(function () {
+          deBounce = false;
+        }, 50);
+    
         file.async("blob").then(function (blob) {
+        
+          const contentTypes = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.jpe': 'image/jpeg',
+            '.png': 'image/png'
+          };
+          const itemContentType = contentTypes[Object.keys(contentTypes).find(ext => file.name.endsWith(ext))];
+
+          if (itemContentType) {
+            const newTab = window.URL.createObjectURL(
+              new window.Blob([blob], { type: itemContentType }));
+            window.open(newTab, '_blank');
+            setTimeout(function () {
+              window.URL.revokeObjectURL(newTab);
+            }, 1500);
+          } else {
+
+            if (lastShownFile === file) {
+              return;
+            }
+            lastShownFile = file;
+
             // https://stackoverflow.com/a/35251739/198996
             var dlink = document.createElement('a');
             dlink.download = file.name;
@@ -303,7 +332,7 @@ function registerFileClickListener(file, element) {
 
             dlink.click();
             dlink.remove();
-        });
+        }});
 
         console.log(file);
     });
